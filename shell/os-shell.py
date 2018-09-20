@@ -2,16 +2,18 @@
 
 import os, sys, time, re
 from os.path import expanduser
+import fileinput
 
 def pipe(args):
     pid = os.getpid()               # get and remember pid
+   
+    pipeIndex = args.index('|')
     
     pipein,pipeout = os.pipe()
     for f in (pipein, pipeout):
         os.set_inheritable(f, True)
     print("pipe fds: pr=%d, pw=%d" % (pipein, pipeout))
     
-    import fileinput
     
     print("About to fork (pid=%d)" % pid)
     
@@ -22,23 +24,48 @@ def pipe(args):
         sys.exit(1)
     
     elif rc == 0:                   #  child - will write to pipe
+        args = args[:pipeIndex]
         print("Child: My pid==%d.  Parent's pid=%d" % (os.getpid(), pid), file=sys.stderr)
-        args = ["wc", "p3-exec.py"]
     
         os.close(1)                 # redirect child's stdout
-        os.dup(pipeout)
+        fd = os.dup(pipeout)
+        os.set_inheritable(fd, True)
         for fd in (pipein, pipeout):
             os.close(fd)
-        print("hello from child")
-                 
+        if os.path.isfile(args[0]):
+            try:
+                os.execve(args[0], args, os.environ) # try to exec program
+            except FileNotFoundError:             # ...expected
+                pass                              # ...fail quietly
+        else:
+            checkPATH(args)
+            
+        os.write(1, ("%s: command not found\n" % args[0]).encode())
+
+        sys.exit(1)                 # terminate with error
+
     else:                           # parent (forked ok)
         print("Parent: My pid==%d.  Child's pid=%d" % (os.getpid(), rc), file=sys.stderr)
+        args = args[pipeIndex+1:]
+
         os.close(0)
-        os.dup(pipeout)
-        for fd in (pipein, pipeout):
+        fd = os.dup(pipein)
+        os.set_inheritable(fd, True)
+        for fd in (pipeout, pipein):
             os.close(fd)
-        for line in fileinput.input():
-            print("From child: <%s>" % line)
+
+        if os.path.isfile(args[0]):
+            try:
+                os.execve(args[0], args, os.environ) # try to exec program
+            except FileNotFoundError:             # ...expected
+                pass                              # ...fail quietly
+        else:
+            checkPATH(args)
+            
+        os.write(1, ("%s: command not found\n" % args[0]).encode())
+
+        sys.exit(1)                 # terminate with error
+
         
 def redirectTo(args):
     fileIndex = args.index('>') + 1
@@ -98,6 +125,7 @@ def redirectFrom(args):
         sys.stdin = open(filename, "r+b")
             
         os.set_inheritable(0, True)
+    
     
         if os.path.isfile(args[0]):
             try:
@@ -172,6 +200,8 @@ def prompt():
             redirectTo(args)
         elif '<' in userIn:
             redirectFrom(args)
+        elif '|' in userIn:
+            pipe(args)
         else:
             execute(args)
 
