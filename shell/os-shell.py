@@ -95,9 +95,9 @@ def redirectFrom(args):
     elif rc == 0:                   # child 
         os.close(0)                 # redirect child's stdout
 
-        sys.stdin = open(filename, "w")
+        sys.stdin = open(filename, "r+b")
             
-        os.set_inheritable(1, True)
+        os.set_inheritable(0, True)
     
         if os.path.isfile(args[0]):
             try:
