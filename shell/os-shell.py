@@ -12,10 +12,8 @@ def pipe(args):
     pipein,pipeout = os.pipe()
     for f in (pipein, pipeout):
         os.set_inheritable(f, True)
-    print("pipe fds: pr=%d, pw=%d" % (pipein, pipeout))
     
     
-    print("About to fork (pid=%d)" % pid)
     
     rc = os.fork()
     
@@ -25,7 +23,6 @@ def pipe(args):
     
     elif rc == 0:                   #  child - will write to pipe
         args = args[:pipeIndex]
-        print("Child: My pid==%d.  Parent's pid=%d" % (os.getpid(), pid), file=sys.stderr)
     
         os.close(1)                 # redirect child's stdout
         fd = os.dup(pipeout)
@@ -45,7 +42,6 @@ def pipe(args):
         sys.exit(1)                 # terminate with error
 
     else:                           # parent (forked ok)
-        print("Parent: My pid==%d.  Child's pid=%d" % (os.getpid(), rc), file=sys.stderr)
         args = args[pipeIndex+1:]
 
         os.close(0)
