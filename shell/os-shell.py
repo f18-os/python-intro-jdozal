@@ -13,8 +13,6 @@ def pipe(args):
     for f in (pipein, pipeout):
         os.set_inheritable(f, True)
 
-
-
     rc = os.fork()
 
     if rc < 0:
